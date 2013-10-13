@@ -1,0 +1,194 @@
+@import url(http://fonts.googleapis.com/css?family=Quicksand:300,400,700|PT+Mono);
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video {
+    margin:0;
+    padding:0;
+    border:0;
+    font-size:100%;
+    font:inherit;
+    vertical-align:baseline;
+    font-family: 'Quicksand', Verdana, Helvetica, san-serif
+}
+article, aside, details, figcaption, figure, footer, header, hgroup, menu, nav, section {
+    display:block;
+}
+body {
+    line-height:120%;
+}
+ol, ul {
+    list-style:none;
+}
+blockquote, q {
+    quotes:none;
+}
+blockquote:before, blockquote:after, q:before, q:after {
+    content:'';
+    content:none;
+}
+table {
+    border-collapse:collapse;
+    border-spacing:0;
+}
+body {
+    line-height: 140%;
+}
+h1{
+	font-size: 20pt;
+	font-weight: 300;
+	margin: 40px 0 20px 0;
+	color: #8A8A8A;
+}
+h2 {
+	font-size: 12pt;
+	font-weight: bold;
+	margin: 20px 0 10px 0;
+}
+body, p, table, ul , ol {
+	font-size: 11pt;
+	color: #363636;
+}
+strong {
+	font-weight: bold;
+}
+#mainwrapper {
+	padding: 10px;
+
+}
+.wrapper {
+	float: left;
+}
+.c, .clear {clear: both;}
+#leftcolumn {
+	min-width: 200px;
+	width: 22%; 
+}
+#middlecolumn {
+	min-width: 700px;
+	width: 54%; 
+}
+#rightcolumn {
+	min-width: 200px;
+	width: 22%; 
+}
+@media only screen and (max-width: 1290px){
+	#rightcolumn {
+	min-width: 100px;
+	width: 12%;
+	}
+}
+#filewrapper {
+	position: absolute;
+	right: 0px;
+	top: 0;
+	border-bottom: 2px solid #cecece;
+	border-left: 2px solid #cecece;
+	box-shadow: 0px 0px 3px #cecece;
+	padding: 20px;
+}
+#canvas {
+	float: left;
+	min-width: 700px;
+	width: 100%;
+	height: 700px;
+}
+.wrapper#dnacontainer {
+	clear: left;
+	width: 100%;
+	margin-top: 20px;
+	position: relative;
+}
+.dnaseq, .wrapper#dnacontainer	, #fontwidth-helper{
+	font-family: monospace;
+	color: #444444;
+	position: relative;
+	word-wrap: break-word;
+	font-size: 13px;
+	line-height: 25px;
+
+}
+.dnaseq {
+		z-index: 100;
+}
+#dnaseqinter{
+	display: none;
+}
+.dnahighlight {
+	color: #fff;
+	background: #0A7500;
+	font-family: monospace;
+	word-wrap: break-word;
+}
+.dnaback{
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+}
+.restenz {
+	color: #057E00;
+	font-size: 11px;
+	font-family: monospace;
+	position: absolute;
+	line-height: 15px;
+	font-weight: bold;
+}
+#fontwidth-helper {	
+	position: absolute;
+	visibility: hidden;		
+	width: auto;
+	background: red;
+}
+
+
+/*features*/
+#featurelist {
+	border: 1px #cecece dashed;
+}
+#featureattention {
+	padding: 10px;
+}
+.feature {
+	display: block;
+	padding: 5px;
+	cursor: pointer;
+}
+.feature:hover, .featureplus, .fSelected {
+	background: #EDEDED;
+}
+.featureplus {
+	display: none;
+	padding: 2px 5px 5px 10px;
+	font-family: monospace;
+}
+.frange {
+	font-family: monospace;
+}
+.fSelected h3 {
+	font-weight: bold;
+}
+
+
+/*restriction*/
+
+.restrictionlabel {
+	display: inline-block;
+	padding: 2px 8px;
+	margin: 2px;
+	font-size: 14px;
+	font-weight: bold;
+}
+.restrictionlabel:hover {
+	opacity: 0.8;
+	cursor: pointer;
+}
+.restcheckbox {
+	display: none;
+}
+.restcheckbox:checked + .restrictionlabel{
+	background: #057E00;
+	color: #fff;
+}
+
+.loadedfile {
+	padding: 5px;
+	cursor: pointer;
+}

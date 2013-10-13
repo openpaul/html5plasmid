@@ -1,0 +1,860 @@
+/*function Apple (type) {
+    this.type = type;
+    this.color = "red";
+    this.getInfo = function() {
+        return this.color + ' ' + this.type + ' apple';
+    };
+}
+
+var apple = new Apple('macintosh');
+apple.color = "reddish";
+console.log(apple.getInfo());
+
+var dude = new Apple('macintosh');
+var dude2 = new Apple('macintosh');
+
+
+dude.color = "blue";
+dude2.color = "lia";
+console.log(dude.getInfo());
+console.log(dude2.getInfo());*/
+
+var options = {
+		
+		'dna2Uppercase': true
+
+};
+var fcolors = {
+			'standart'     : '#0073BA',
+			'standartHighlight'     : '#0A7500',
+			'misc_feature' : '#DA0E3F',
+			'terminator'   : '#0F1B21',
+			'CDS'          : '#00689C',
+			'promoter'     : '#42A600',
+			'rep_origin'   : '#581B87',
+			'protein_bind' : '#0EC6DA',
+			'gene'         : '#DABB0E'
+};
+
+var currentObject = {};
+
+console.log();
+
+function startup(){
+	//starts the fileloader
+	document.getElementById('fileinput').addEventListener('change', fileloader, false);
+
+	// get the dom ready
+	updateDom({},"update");
+	loadDB();
+}
+
+
+/*
+	
+	File loader
+
+	Retrives a file and processes it. Saves it all in a DB
+
+*/
+function fileloader() {
+	var file = document.getElementById('fileinput').files[0];
+	if(file){
+
+		var filename = file.name;
+		updateDom({"#title": "loading file: " + filename},"update");
+
+		var reader = new FileReader();
+		// Read file into memory as UTF-8     
+		reader.readAsText(file, "UTF-8");
+		// Handle progress, success, and errors
+		//reader.onprogress = updateProgress;
+		reader.onload  = (function(file){ // this construct enables us to get acces to the filename in th parseFile()!
+							var fileName = file.name;
+							return function(e){
+								parseFile( e, file);
+							};
+						})(file); 
+		
+		//reader.onerror = errorHandler;
+	}
+
+	console.log("We try opening this file:" + filename);
+
+}
+
+
+
+function parseFile( txtfile, file ){
+
+	var fileString = txtfile.target.result;
+
+	//replace more than one whitespace with just one white space, cause we use the " " as delimiter
+	// split string into the lines
+	var filearray=fileString.split(/\r\n|\r|\n/g);
+	
+	var origin      = false;   // at first read features and stuff
+	var featurelist = Array(); // one array to rule them all
+
+
+	// now lets loop the lines once
+	// handle every line individually
+	var length = filearray.length,
+		line   = null;
+	for (var i = 0; i < length; i++) {
+		// this is the line as a string
+		line = filearray[i];
+		// if the origin mode is on, the rest of the file is DNA, so we can ignore every other action!
+		if(origin == true){
+			// add the DA-Sqeuenze but remove whitespace and numbers
+			origincode = origincode + line.replace(/\s+/g,'').replace(/\d+/g,'').replace(/\/+/,'');
+		}else if(line.search("ORIGIN") != -1){
+			// We've found the start of the ORIGIN part, so...
+			origin     = true;  // ... lets switch into the originMode and ...
+			origincode = "";    // ... create empty string to save the DNA-Sequence.
+			console.log("[ORIGIN] I've found the DNA");
+		}else if(line.search(/\S+\s+\d+\..\d+/) != -1 || line.search(/\S+\d+\..\d+/) != -1){		
+			//////////////////////////////////////			
+			// This is the Featurehandler
+			// its very important!!!
+			// Exclude lines with / or " from beeing detected as a feature
+			// Every other line, that start something like :
+			// string    123..123 or string (12..12/12..12)
+			// is a feature!
+			if(line.search(/["\/]+/) == -1 && line.search("source") == -1 ){
+				//find the type of the feature and from where to where it goes
+				
+				//make it pretty first
+				feature     = line.replace(/\s+/g,' ').trim();
+				//get the parts
+				featurepart = feature.split(" ");
+				// retrive the type of feature
+				fType       = featurepart[0];
+				//now check the location
+				var re      = /\d+/g; // regular expression to find the start and stop!				
+				startar     = re.exec(featurepart[1]);
+				stopar      = re.exec(featurepart[1]);
+				start       = parseInt(startar[0]);
+				stop        = parseInt(stopar[0]);
+				
+				// Calc the length
+				if(stop > start){
+					fLength  = stop - start;				
+				}else{
+					// what if the plasmid is round and some feature is from 6000..100 for example?!
+					fLength  = "recalc"; //needs to be recalculated, as soon as we know how long the whole plasmid is!
+				}
+
+				// check if it is a complementary feature
+				if(line.search(/complement/) != -1){
+					complement = "true";
+				}else{
+					complement = "false";				
+				}	
+				//console.log(complement + line);
+				// here we have to improve it a bit in the feature!!!
+				
+				//store the information in a new array:
+				temparray = {"type"       : fType,
+							 "start"      : start,
+							 "stop"       : stop,
+							 "fLength"    : fLength,
+							 "complement" : complement}
+				featurelist.push(temparray);				
+				temparray = null; // make a new array possible
+
+				console.log("[NEW FEATURE] I've found a " + fType);
+			}
+		//  check if this is a featuremode
+		}else if(line.search("\label") != -1 && featurelist.length){
+			if(line.search(/\"\S+\"/) != -1){
+				// this label has ""
+				//console.log(line);
+				var re      = /\"\S+\"/g;				
+				labelar       = re.exec(line);
+				label       = labelar[0].substr(1,labelar[0].length - 2);
+			}else{
+				// without ""
+				labelparts = line.split("=");
+				label      = labelparts[1];
+			}
+			console.log("LABEL: " + label);
+			featurelist[featurelist.length-1]["label"] = label;
+		
+		//  else check is its one of the standart elements as title and so
+		}else if(line.search("LOCUS") != -1){
+			locus = line.replace(/\s+/g,' ').replace("LOCUS", '').trim();
+			//console.log("LOCUS: " + locus);
+			
+		}else if(line.search("DEFINITION") != -1){
+			definitition = line.replace(/\s+/g,' ').replace("DEFINITION", '').trim();
+			//console.log("DEFINITION: " + definitition)
+		}else{
+			//console.log("Either there is nothing in this line or I do not know what it means!");
+			//console.log("I'm talking about this:");
+			//console.log(line);
+		}
+
+	}
+
+	if(options.dna2Uppercase){
+		// make the now known origincode to uppercase
+		origincode = origincode.toUpperCase();
+	}else{
+		origincode = origincode.toLowerCase();
+	}
+	console.log("We have " + origincode.length + "bp of DNA locked and loadet!");
+
+	//reorganize feature by size, so we can have the large and important features at the top!
+	// create arrray with : array(){length: key}
+	var sortarray = {}; // {} will create an object
+	for (f in featurelist){
+		//add a svg-id, so it wont mess our whole thing up
+		featurelist[f]["svgid"] = "featurenr" + f;
+		fLength = featurelist[f]["fLength"];
+		// some features may have an unknown length!
+		if(fLength == "recalc"){
+			start = featurelist[f]["start"];
+			stop  = featurelist[f]["stop"];
+			fLength = stop + origincode.length - start;
+			featurelist[f]["fLength"] = fLength;
+			console.log(fLength +"rec" + start + " + "+origincode.length +" -"+stop);
+		}
+		// finally add the array to the order-array
+		sortarray[fLength] = f;
+	}
+	// resortet Array
+	sortetfeaturelist = new Array();
+	// now add the reordert items to the new array!
+	for(i in sortarray){
+		sortetfeaturelist.push(featurelist[sortarray[i]]);
+	}
+	// it seems thath we need to reverse the array now. so what the heck
+	sortetfeaturelist.reverse();
+	//this we can upate and so hold all the new files!
+	timestamp = new Date().getTime();
+
+	// now save the new handlet file to a db!
+	//assamble the json:
+	newDBObject = {
+			'filename'        : file.name,
+			'features'        : sortetfeaturelist,
+			'dnacode'         : origincode,
+			'restriction'     : new Array,
+			'restrictionsites': new Array,
+			'lastused'        : timestamp
+	};
+	saveFile = file2DB(newDBObject);
+	
+	//drawDNA(origincode.length, sortetfeaturelist);
+	//printFeatureList(featurelist);
+
+	//addRestrict(origincode);
+
+}
+
+
+function file2DB ( file ){
+	var save = false;
+	var request = indexedDB.open('htmlplasmid',1);
+	request.onsuccess = function(){
+		console.log('[DB] Datenbank geöffnet');
+		var db = this.result;
+		var trans = db.transaction(['features'], 'readwrite');
+		var store = trans.objectStore('features')
+		var request = store.put(file); // `item` in dem Store ablegen
+		// Erfolgs-Event
+		request.onsuccess = function(evt){
+
+		 	console.log('[DB] Eintrag ' + evt.target.result + ' gespeichert');
+			
+			// new file has been saved
+			// open it up
+			loadDBitem(evt.target.result);
+			//loadDB();
+		};	
+		request.onerror = function(evt){
+			console.log("[ERROR] Could not save the file.");
+			console.log("Is everything alright with your browser?");
+		};	
+
+	}
+
+}
+
+function loadDB(){
+	var dbname = 'htmlplasmid';
+	//var del = indexedDB.deleteDatabase(dbname,1); // del the database- testing only
+	var request = indexedDB.open(dbname,1);
+		request.onupgradeneeded = function(){
+			console.log('Datenbank angelegt');
+			var db = this.result;
+			if(!db.objectStoreNames.contains('features')){
+				store = db.createObjectStore('features', {keyPath: 'key',autoIncrement: true});
+				console.log("Index angelegt");
+				index = store.createIndex("by_lastused", "lastused");
+			}
+
+
+		};
+		request.onsuccess = function(){
+			console.log('Datenbank geöffnet');
+			var db = this.result;
+
+			var trans = db.transaction(['features'], 'readwrite');
+			var store = trans.objectStore('features');	
+			var index = store.index("by_lastused");
+			// Cursor für alle Einträge von 0 bis zum Ende
+
+			
+			var range = IDBKeyRange.lowerBound(0);
+			var oldfiles = "";
+			loadedfiles = new Array;			
+				
+			var cursorRequest = index.openCursor(range,"prev");
+			// Wird für jeden gefundenen Datensatz aufgerufen... und einmal extra
+			cursorRequest.onsuccess = function(evt){
+				var result = evt.target.result;
+				if(result){
+					console.log("[DB] while looking around I've found:", result.value);
+					//var trans = db.transaction(['features'], 'readwrite');
+					//var store = trans.objectStore('features');
+					var key   = result.value.key;
+
+					loadedfiles[parseInt(result.value.lastused)]=result.value;
+				  	// Cursor zum nächsten Eintrag bewegen
+				  	result.continue();
+				}else{
+					//console.log(loadedfiles);
+					count    = 0;
+					maxitems = 10;
+					
+					//loadedfiles.reverse();
+					//console.log(loadedfiles);
+					for (item in loadedfiles){
+						//console.log(loadedfiles[item].key,item,loadedfiles[item]);
+						if(count >= maxitems){
+							//var trans = db.transaction(['features'], 'readwrite');
+							//var store = trans.objectStore('features');	
+							var request = store.delete(parseInt(loadedfiles[item].key));
+					 	 	request.onsuccess = function(evt){
+								console.log('Eintrag ' + loadedfiles[item].key + ' gelöscht');
+							}
+					  	}else{ 
+							//console.log(""item);
+							oldfiles = oldfiles + '<div class="loadedfile" data-key="' + loadedfiles[item].key + '">'+loadedfiles[item].filename + '</div>';	
+							
+						}
+						count = count +1;
+					}
+				}
+				
+				updateDom({'#oldfiles': oldfiles}, "append");
+			};
+			
+			
+	}
+
+}
+
+
+
+function loadDBitem(item) {
+	//console.log("Now I'll try to open up", item);
+	var dbname = 'htmlplasmid';
+	var request = indexedDB.open(dbname,1);
+		
+		request.onsuccess = function(){
+			//console.log('[DB] database opend up');
+			var db = this.result;
+
+			var trans = db.transaction(['features'], 'readwrite');
+			var store = trans.objectStore('features');	
+
+			var loadrequest = store.get(item);
+			
+			//counter  = 0;
+			//maxitems = 10;				
+			// Wird für jeden gefundenen Datensatz aufgerufen... und einmal extra
+			loadrequest.onsuccess = function(evt){
+				//console.log('[DB] found the item');
+				var result = evt.target.result;
+
+
+				//update the timestamp!
+				updatedObject = result;
+				updatedObject.lastused = new Date().getTime();
+				store.put(updatedObject);
+				//console.log(updatedObject);
+				//console.log("updated DB");
+				//update the List!
+				currentObject = updatedObject;
+				processJSON(updatedObject);
+				loadDB();
+
+				//console.log('Eintrag gefunden:', evt.target.result);
+			};
+	}
+
+}
+
+
+
+
+
+//process the json from the DB
+function processJSON(obj){
+	//console.log("I now will process the DB from the file", obj.filename);
+
+	//load the CODE
+	//$('#dnaseq').html(obj.dnacode);
+	//$('#dnaseqinter').html(obj.dnacode);
+	drawSVG(obj);
+	featurelist = printFeatureList(obj.features);
+	restriction = addRestrict(obj.dnacode, obj.restriction)
+	//change the title
+	updated = updateDom({
+			'#title': obj.filename,
+			"#dnaseq": obj.dnacode,
+			'#restrictionscheckbox': restriction.restrictioncheckboxes,
+			'#dnarestriction':restriction.restrictionspans,
+			'#dnaseqinter': obj.dnacode,
+			'#featurelist': featurelist
+	}, "update");
+
+	if(updated){
+		// draw restrictionsites after update, so it seems faster
+		drawRestrictionsites(currentObject.restriction);
+	}
+
+}
+
+function drawSVG(obj){
+	$('#canvas').empty().removeClass("hasSVG");  
+
+	//get the width and center the svg
+	var canvaswidth = parseInt($('#canvas').css("width"));
+	console.log(canvaswidth);
+	var canvascenter = Math.floor(canvaswidth/2);
+	
+	$('#canvas').svg({onLoad: function(svg){
+			svg.circle(canvascenter, 350, 150, {fill: 'none', stroke: '#cecece', 'stroke-width': 3});
+			}
+	});
+
+	var svg = $('#canvas').svg('get');
+	//svg.configure({'viewBox': '0 100 400 400'});
+	//$('svg').attr('viewBox', "0 100 300");
+	drawFeatures(svg, obj.dnacode.length, obj.features, canvascenter);
+/*
+	// draw length
+	svg.line(350, 350, 400, 350, 
+    {stroke: 'blue', strokeWidth: 2, id: 'plasmidlength'});
+	var text = svg.text('',{fontFamily: 'Verdana, Helvetica, san-serif',fontSize: '12', fill: 'black'}); 
+	var texts = svg.createText(); 
+	svg.textpath(text, "#plasmidlength", texts.string("hallo")); */
+}
+
+
+function drawFeatures(svg, length, featurelist, canvascenter){
+	radius      = 150;
+	radiusc     = radius - 8; // a little less, so it starts mor inner
+	extraradius = 15;
+
+	groups = new Array();
+	var featuregroup = svg.group("featuregroup");
+	var text = svg.text('',{fontFamily: 'Verdana, Helvetica, san-serif',fontSize: '12', fill: 'black',dy: -10}); 
+
+
+	//first caluclate the x,y from the polar coordinates
+	for (f in featurelist){
+		if(featurelist[f]["complement"] == "true"){
+			radiusc   = radiusc - extraradius;
+			radiususe = radiusc;
+		}else{
+			radius = radius + extraradius;
+			radiususe = radius;
+		}
+		drawlong = false; //check if the long path should be drawn		
+		if(featurelist[f]["fLength"]/length > 0.5){
+			drawlong = true;		
+		}
+		label = featurelist[f]["label"];
+
+		// get the color:
+		if ($.inArray(featurelist[f]["type"],fcolors)){
+			fcolor = fcolors[featurelist[f]["type"]];
+		}else{
+			fcolor = fcolors["standart"];
+		}
+
+		//make a group
+		groups.push(svg.group(featuregroup,"undergroup" + f)); // can be used like this: groups[groups.length-1]
+
+		acoord = polarToCartesian(canvascenter,350,radiususe,featurelist[f]["start"]*360/length);
+		bcoord = polarToCartesian(canvascenter,350,radiususe,featurelist[f]["stop"]*360/length);
+
+		asmallcoord = polarToCartesian(canvascenter,350,150,featurelist[f]["start"]*360/length);
+		bsmallcoord = polarToCartesian(canvascenter,350,150,featurelist[f]["stop"]*360/length);
+
+		//console.log(acoord[0] +  " " + acoord[1] + "-" + featurelist[f]["stop"]);
+		var path = svg.createPath(); 
+		svg.path(groups[groups.length-1], path.move(acoord[0], acoord[1]).arc(radiususe,radiususe, 0, drawlong, true, bcoord[0], bcoord[1]),{fill: 'none', stroke: fcolor, strokeWidth: 10,id: featurelist[f]["svgid"]});
+	
+
+	var pathe = svg.createPath(); 
+		svg.path(groups[groups.length-1], pathe.move(asmallcoord[0], asmallcoord[1]).arc(150,150, 0, drawlong, true, bsmallcoord[0], bsmallcoord[1]),{fill: 'none', stroke: 'transparent', strokeWidth: 6,id: "small" + featurelist[f]["svgid"]});
+
+	// just add text if there is some space
+	if(Math.abs(featurelist[f]["stop"]*360/length - featurelist[f]["start"]*360/length) > 10){
+		var texts = svg.createText(); 
+		svg.textpath(text, "#"+featurelist[f]["svgid"], texts.string(label)); 
+		}
+	}
+
+}
+
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+	var angleInRadians = angleInDegrees * Math.PI / 180.0;
+	var x = centerX + radius * Math.cos(angleInRadians-0.5* Math.PI);
+	var y = centerY + radius * Math.sin(angleInRadians-0.5* Math.PI);
+	return [x,y];
+}
+
+function drawRestrictionsites(restriction){
+
+	radius            = 150;
+	restrictionRadius = radius;
+	length            = currentObject.dnacode.length
+	stroke            = "red";
+	restrictionsites = currentObject.restrictionsites;
+
+	console.log(restriction,restrictionsites);
+
+	//get the width and center the svg
+	var canvaswidth   = parseInt($('#canvas').css("width"));
+	var canvascenter  = Math.floor(canvaswidth/2);
+	var svg           = $('#canvas').svg('get');
+
+	//remove old restrictionenzymes
+	$('#canvas #restriktion').remove();
+	var restrictiongroup = svg.group("restriktion");
+
+	$.each(restriction, function(i, item){
+		var featuregroup = svg.group(restrictiongroup,"restriktion_" + i);
+		cuttingsites = (restrictionsites[restriction[i]]);
+		if(cuttingsites.length > 0){
+
+			$.each(cuttingsites, function(b,bitem){
+				acoord = polarToCartesian(canvascenter,350,restrictionRadius,bitem*360/length);
+				bcoord = polarToCartesian(canvascenter,350,restrictionRadius,(bitem + 6)*360/length); //+4 to make it visible
+			id = "rest" + item + b;
+			var pathe = svg.createPath(); 
+			svg.path(featuregroup, pathe.move(acoord[0], acoord[1]).arc(150,150, 0, false, true, bcoord[0], bcoord[1]),{fill: 'none', stroke: stroke, strokeWidth:12,id: id});
+		});
+
+		}
+	});
+
+/*
+	//get the width and center the svg
+	var canvaswidth   = parseInt($('#canvas').css("width"));
+	var canvascenter  = Math.floor(canvaswidth/2);
+	var svg           = $('#canvas').svg('get');
+
+	$.each(restrictionsites, function(i, item){
+
+		if($.inArray(i, restrictions) > -1){
+			stroke = "red";
+		}else{
+			stroke = "transparent";
+		}
+
+		var featuregroup = svg.group("restriktion_" + i);
+
+		$.each(item,function(b,bitem){
+
+			acoord = polarToCartesian(canvascenter,350,restrictionRadius,bitem*360/length);
+			bcoord = polarToCartesian(canvascenter,350,restrictionRadius,(bitem + 6)*360/length); //+4 to make it visible
+			id = "rest" + item + b;
+			var pathe = svg.createPath(); 
+			svg.path(featuregroup, pathe.move(acoord[0], acoord[1]).arc(150,150, 0, false, true, bcoord[0], bcoord[1]),{fill: 'none', stroke: stroke, strokeWidth:12,id: id});
+		});
+		//console.log(i);	
+
+	});	
+*/
+
+
+}
+
+function printFeatureList(featurelist){
+	console.log("Will now handle all the features");
+	featureDOM = "";
+	for(f in featurelist){
+		type    = featurelist[f]["type"];
+		label   = featurelist[f]["label"];
+		start   = featurelist[f]["start"];
+		stop    = featurelist[f]["stop"];
+		length  = featurelist[f]["fLength"];
+		svgid   = featurelist[f]["svgid"];
+		// get the color:
+		if ($.inArray(featurelist[f]["type"],fcolors)){
+			fcolor = fcolors[featurelist[f]["type"]];
+		}else{
+			fcolor = fcolors["standart"];
+		}
+		featureDOM = featureDOM + '<div class="feature" data-color="'+ fcolor +'" data-type="'+ type +'" data-svg="'+ svgid +'" data-start="'+start+'" data-stop="'+stop+'"><h3><strong>' + label + '</strong> <span class="frange">('+start+'-'+stop+')</span></h3><div class="featureplus">type:   '+ type +'<br />start:   '+start+'<br />stop:   '+stop+'<br />length: ' + length + 'bp</div></div>';
+		
+	}
+
+	return featureDOM;
+}
+
+
+function updateDom(domUpdate, kind){
+
+	var defaults = {
+			'#featurelist': 'Features may appear here',
+			'#title': "Please load a GenBank File!",
+			'#oldfiles': 'You have no files loaded',
+			"#dnaseq":"DNA will appear here...",
+			'#dnaseqinter': '',
+			'#dnarestriction':'',
+			'#restrictionscheckbox':'',
+			'#fontwidth-helper': 'ATGCATGCATGCATGC'
+
+	};
+	if(kind == "update"){
+	/* merge defaults and options, without modifying defaults */
+	this.dom = $.extend({}, defaults, domUpdate);
+	}else{
+		this.dom = domUpdate;
+	}
+
+	for(key in dom){
+		$(key).html(dom[key]);	
+	}
+	
+	return true;
+	
+}
+
+function saveRestrictions(){
+
+	item = parseInt($('.loadedfile:first').attr("data-key"));
+	
+	//parse the restrictionenzxmes
+	restrictionenzymes = new Array;
+	$('.restcheckbox:checked').each(function(){
+		restrictionenzymes.push($(this).attr("name"));
+		
+	});
+
+	//console.log("Now I'll try to open up",item,restrictionenzymes);
+	var dbname = 'htmlplasmid';
+	var request = indexedDB.open(dbname,1);
+		
+		request.onsuccess = function(){
+			console.log('[DB] database opend up');
+			var db = this.result;
+
+			var trans = db.transaction(['features'], 'readwrite');
+			var store = trans.objectStore('features');	
+
+			var loadrequest = store.get(item);
+			
+			//counter  = 0;
+			//maxitems = 10;				
+			// Wird für jeden gefundenen Datensatz aufgerufen... und einmal extra
+			loadrequest.onsuccess = function(evt){
+				console.log('[DB] found the item',evt.target.result);
+				var result    = evt.target.result;
+				updatedObject = result;
+				//update the restrictions!
+				updatedObject.restriction = restrictionenzymes;
+				currentObject.restriction = restrictionenzymes;
+				store.put(updatedObject);
+				//console.log(updatedObject);
+				console.log("updated DB");
+
+				//console.log('Eintrag gefunden:', evt.target.result);
+			};
+	}
+	
+	//update the SVG
+	drawRestrictionsites(restrictionenzymes);
+
+}
+
+
+function addRestrict(text, restrictions){
+
+	restrictionspans      = "";
+	restrictioncheckboxes = "";
+
+	//get width of a character, so we can calc with it
+	cwidth = $('#fontwidth-helper').css("width");
+	ccount = $('#fontwidth-helper').attr("data-length");
+	// needs (!) to be floor!
+	charwidth = Math.floor(parseInt(cwidth)/parseInt(ccount));
+
+	//calc the amount of chars in a row:
+	rwidth    = $('#dnaseq').css("width");
+	charcount = Math.floor(parseInt(rwidth)/parseInt(charwidth));
+	
+	//console.log("Char per row: " + charcount);
+
+
+	//now search for the places to cut
+	console.log("Finding all the restrictionsites may take a few seconds!");
+
+	// object for the restrictionsites needts to be empty!
+	restrictionsites = {};
+
+	$.each(rebase, function(i, item) {
+
+		restrictionOfThis = new Array();
+
+		rec = new RegExp(item.regex, 'gi');
+	 	var match;
+
+		//show it or not?
+		//console.log(item.enzname,$.inArray(item.enzname, restrictions),restrictions);
+		if($.inArray(item.enzname, restrictions) > -1){
+			//console.log("in");
+			display = "block";
+			checked = 'checked="checked"';
+		}else{
+			display = "none";
+			checked = "";
+		}
+
+		while((match = rec.exec(text))) {
+
+			restrictionOfThis.push(match.index);
+
+
+			charperwor = charcount;
+			rowhight = 25; //px
+			rwosdown = Math.floor(match.index/charcount);
+	
+			
+			//append span
+			csstop = 18 + (rwosdown-1) *25;
+			cssleft = charwidth * (match.index - Math.floor(match.index/charcount) * charcount);
+			
+			restrictionspans = restrictionspans + '<span data-restriction="'+item.enzname+'" style="top: '+csstop+'px; left: '+cssleft+'px; display: '+display+'" class="restenz restrictionsite'+item.enzname+'">'+item.enzname+'</span>';
+
+			//also draw the restriktionenzymes
+
+		}
+		
+		//append the restrictionsite to the object
+		restrictionsites[item.enzname] = restrictionOfThis;
+
+		//either way append an field to the select box
+		restrictioncheckboxes = restrictioncheckboxes + '<input id="rest'+item.enzname+'" type="checkbox" name="'+item.enzname+'" class="restcheckbox" value="'+item.enzname+'"  '+checked+'/><label for="rest'+item.enzname+'" class="restrictionlabel">'+item.enzname+'</label>';
+
+	});
+
+
+	currentObject.restrictionsites = restrictionsites;
+
+	return {"restrictioncheckboxes": restrictioncheckboxes,
+			"restrictionspans"     : restrictionspans,
+			"restrictionsites"     : restrictionsites,
+			"restrictions"         : restrictions}
+}
+
+
+
+
+/*interaktivity*/
+
+function highlightdna(element){
+	//console.log("hover");
+	code  = $('#dnaseq').html();
+	$('#dnaseqinter').hide();
+	start  = parseInt(element.attr("data-start"));
+	stop   = parseInt(element.attr("data-stop"));
+	svgid  = element.attr("data-svg");
+	type   = element.attr("data-type");
+	fcolor = element.attr("data-color");
+
+	if(stop > start){
+		before = code.substr(0,start-1);
+		inside = code.substr(start-1,stop-start+1);
+		after  = code.substr(stop);
+		interactiveDNA = before + '<span class="dnahighlight" style="background-color: ' + fcolor +'">' + inside +'</span>' + after;
+	}else{
+		first   = code.substr(0,stop-1);
+		outside = code.substr(stop-1,start-1);
+		last    = code.substr(start+stop-2);
+		interactiveDNA = '<span class="dnahighlight" style="background-color: ' + fcolor +'">' + first +'</span>'+  outside  + '<span class="dnahighlight" style="background-color: ' + fcolor +'">' + last + '</span>';
+		//console.log(last+first);
+	}
+
+	$('#dnaseqinter').html(interactiveDNA).show();
+	$('#dnaseq').hide();
+	$("path[id^=small]").attr("stroke","transparent");
+	$('#small'+svgid).attr("stroke",fcolor);
+}
+
+// restrictionenzyme:
+$('#restrictionselector').on("change",'.restcheckbox', function(){
+	restname = $(this).attr("value");
+	//console.log("change" + restname);
+	if( $(this).is(':checked')){
+		$('span.restrictionsite'+restname).show();
+		//console.log("Show:" + restname);
+		
+		$('#canvas #restriktion_' + restname + ' path').css("stroke","red");
+
+	}else{
+		$('span.restrictionsite'+restname).hide();
+		//console.log("Hide:" + restname);
+
+		$('#canvas #restriktion_' + restname + ' path').css("stroke","transparent");
+
+	}
+	saveRestrictions();
+});
+
+// oldfiles:
+$('#oldfiles').on("click",'.loadedfile', function(){
+	itemid = $(this).attr("data-key");
+	loadDBitem(parseInt(itemid));
+
+});
+
+
+$('#featurelist').on("mouseover",'.feature', function(){
+	highlightdna($(this));
+});
+
+
+$('#featurelist').on("click",'.feature', function(){
+	highlightdna($(this));
+	$('.featureplus').hide();
+	$('.feature').removeClass('fSelected')
+	$('.featureplus', this).show();
+	$(this).addClass('fSelected');
+
+});
+
+$('#featurelist').on("mouseout",'.feature', function(){
+	if($('.feature.fSelected').length > 0 ){
+		highlightdna($('.feature.fSelected'));
+	}else{
+		$('#dnaseq').show();
+		$('#dnaseqinter').hide();
+	}
+
+});
+
+
+
+//Start all necesarry functions
+startup();
+
